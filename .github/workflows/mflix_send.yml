@@ -41,28 +41,35 @@ jobs:
           FILE_ID: ${{ github.event.inputs.file_id }}
           USER_JID: ${{ github.event.inputs.user_jid }}
         run: |
-          # Python script එක වෙනම file එකකට ලියනවා
-          cat <<EOF > downloader.py
+          # Secrets තියෙනවද බලන Debugging පියවරක්
+          if [ -z "$VOE_KEY" ]; then echo "Error: VOE_KEY is missing in Secrets"; exit 1; fi
+          
+          # Python Script එක වෙනම file එකකට ලියනවා
+          cat <<'EOF' > downloader.py
           import os, requests, sys
           voe_key = os.getenv('VOE_KEY')
           file_id = os.getenv('FILE_ID')
           url = None
-          if len(file_id) > 20:
-              url = f'https://drive.google.com/uc?export=download&id={file_id}'
-          else:
-              try:
-                  r = requests.get(f'https://voe.sx/api/drive/v2/file/info?key={voe_key}&file_code={file_id}')
-                  res = r.json()
-                  url = res.get('result', {}).get('direct_url')
-              except: pass
-          if url:
-              print(f"Downloading from: {url}")
-              with requests.get(url, stream=True) as r:
-                  with open('movie_mflix.mp4', 'wb') as f:
-                      for chunk in r.iter_content(chunk_size=8192): f.write(chunk)
-              print('Download Complete!')
-          else:
-              print('Error: URL not found')
+          
+          try:
+              if len(file_id) > 20:
+                  url = f"https://drive.google.com/uc?export=download&id={file_id}"
+              else:
+                  api_url = f"https://voe.sx/api/drive/v2/file/info?key={voe_key}&file_code={file_id}"
+                  r = requests.get(api_url).json()
+                  url = r.get('result', {}).get('direct_url')
+              
+              if url:
+                  print(f"Downloading...")
+                  with requests.get(url, stream=True) as r:
+                      with open('movie_mflix.mp4', 'wb') as f:
+                          for chunk in r.iter_content(chunk_size=8192): f.write(chunk)
+                  print('Download Complete!')
+              else:
+                  print('Error: Could not find download URL')
+                  sys.exit(1)
+          except Exception as e:
+              print(f"Error: {e}")
               sys.exit(1)
           EOF
           
