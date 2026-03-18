@@ -31,7 +31,8 @@ jobs:
       - name: Install Dependencies
         run: |
           pip install requests gdown
-          npm install @whiskeysockets/baileys pino axios zlib
+          # මෙතනින් zlib අයින් කරලා තියෙන්නේ
+          npm install @whiskeysockets/baileys pino axios 
 
       - name: Download Video (Python)
         env:
