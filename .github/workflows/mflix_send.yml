@@ -1,38 +1,70 @@
-- name: Process and Send
+name: Send Movie File (Test)
+
+on:
+  workflow_dispatch:
+    inputs:
+      file_id:
+        description: 'වීඩියෝ එකේ ID එක (GDrive හෝ VOE)'
+        required: true
+        default: '4ua1l9lragrg'
+      user_jid:
+        description: 'ඔයාගේ WhatsApp Number එක'
+        required: true
+        default: '94766886046@s.whatsapp.net'
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install Dependencies
+        run: |
+          pip install requests
+          npm install @whiskeysockets/baileys pino axios qrcode-terminal
+
+      - name: Run Script
         env:
           VOE_KEY: ${{ secrets.VOE_KEY }}
           SESSION_ID: ${{ secrets.SESSION_ID }}
           FILE_ID: ${{ github.event.inputs.file_id }}
           USER_JID: ${{ github.event.inputs.user_jid }}
         run: |
-          python3 -c "
-          import os, requests
+          # Python script එක වෙනම file එකකට ලියනවා
+          cat <<EOF > downloader.py
+          import os, requests, sys
           voe_key = os.getenv('VOE_KEY')
           file_id = os.getenv('FILE_ID')
           url = None
-          
-          if not voe_key:
-              print('Error: VOE_KEY is missing in Secrets!')
-              exit(1)
-
           if len(file_id) > 20:
               url = f'https://drive.google.com/uc?export=download&id={file_id}'
           else:
               try:
-                  # VOE API call එක නිවැරදිව කිරීම
-                  api_url = f'https://voe.sx/api/drive/v2/file/info?key={voe_key}&file_code={file_id}'
-                  r = requests.get(api_url).json()
-                  url = r.get('result', {}).get('direct_url')
-              except Exception as e:
-                  print(f'API Error: {e}')
-          
+                  r = requests.get(f'https://voe.sx/api/drive/v2/file/info?key={voe_key}&file_code={file_id}')
+                  res = r.json()
+                  url = res.get('result', {}).get('direct_url')
+              except: pass
           if url:
-              print(f'Downloading from: {url}')
+              print(f"Downloading from: {url}")
               with requests.get(url, stream=True) as r:
                   with open('movie_mflix.mp4', 'wb') as f:
                       for chunk in r.iter_content(chunk_size=8192): f.write(chunk)
               print('Download Complete!')
           else:
-              print('Error: URL not found or API call failed')
-          "
+              print('Error: URL not found')
+              sys.exit(1)
+          EOF
+          
+          python3 downloader.py
           node send.js
